@@ -1,6 +1,7 @@
 package edu.berkeley.cs186.database.query.join;
 
 import edu.berkeley.cs186.database.TransactionContext;
+import edu.berkeley.cs186.database.common.iterator.ArrayBacktrackingIterator;
 import edu.berkeley.cs186.database.common.iterator.BacktrackingIterator;
 import edu.berkeley.cs186.database.query.JoinOperator;
 import edu.berkeley.cs186.database.query.QueryOperator;
@@ -86,7 +87,16 @@ public class BNLJOperator extends JoinOperator {
          * You may find QueryOperator#getBlockIterator useful here.
          */
         private void fetchNextLeftBlock() {
-            // TODO(proj3_part1): implement
+            if(!this.leftSourceIterator.hasNext()) {
+                return;
+            }
+            BacktrackingIterator<Record> backtrackingIterator = getBlockIterator(this.leftSourceIterator, getSchema(), numBuffers - 2);
+            if(!backtrackingIterator.hasNext()) {
+                return;
+            }
+            this.leftBlockIterator = backtrackingIterator;
+            this.leftBlockIterator.markNext();
+            this.leftRecord = this.leftBlockIterator.next();
         }
 
         /**
@@ -100,7 +110,15 @@ public class BNLJOperator extends JoinOperator {
          * You may find QueryOperator#getBlockIterator useful here.
          */
         private void fetchNextRightPage() {
-            // TODO(proj3_part1): implement
+            if(!this.rightSourceIterator.hasNext()) {
+                return;
+            }
+            BacktrackingIterator<Record> backtrackingIterator = getBlockIterator(this.rightSourceIterator, getSchema(), 1);
+            if(!backtrackingIterator.hasNext()) {
+                return;
+            }
+            this.rightPageIterator = backtrackingIterator;
+            this.rightPageIterator.markNext();
         }
 
         /**
@@ -112,8 +130,39 @@ public class BNLJOperator extends JoinOperator {
          * of JoinOperator).
          */
         private Record fetchNextRecord() {
-            // TODO(proj3_part1): implement
-            return null;
+            if(leftRecord == null) {
+                nextRecord = null;
+                return null;
+            }
+            Record rec = null;
+            while(rec == null) {
+                if(this.rightPageIterator != null && this.rightPageIterator.hasNext()) {
+                    Record rightRecord = this.rightPageIterator.next();
+                    if(compare(this.leftRecord, rightRecord) == 0) {
+                        rec = this.leftRecord.concat(rightRecord);
+                    }
+                }
+                else if(this.leftBlockIterator.hasNext()) {
+                    this.leftRecord = this.leftBlockIterator.next();
+                    this.rightPageIterator.reset();
+                }
+                else if(this.rightSourceIterator.hasNext()) {
+                    this.fetchNextRightPage();
+                    this.leftBlockIterator.reset();
+                    this.leftRecord = this.leftBlockIterator.next();
+                }
+                else if(this.leftSourceIterator.hasNext()){
+                    this.fetchNextLeftBlock();
+                    this.leftRecord = this.leftBlockIterator.next();
+                    this.rightSourceIterator.reset();
+                    this.fetchNextRightPage();
+                }
+                else {
+                    return null;
+                }
+            }
+            nextRecord = rec;
+            return rec;
         }
 
         /**
