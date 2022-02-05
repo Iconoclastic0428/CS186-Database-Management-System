@@ -8,6 +8,7 @@ import edu.berkeley.cs186.database.query.join.BNLJOperator;
 import edu.berkeley.cs186.database.query.join.SNLJOperator;
 import edu.berkeley.cs186.database.table.Record;
 import edu.berkeley.cs186.database.table.Schema;
+import edu.berkeley.cs186.database.table.Table;
 
 import java.util.*;
 
@@ -575,8 +576,28 @@ public class QueryPlan {
      */
     public QueryOperator minCostSingleAccess(String table) {
         QueryOperator minOp = new SequentialScanOperator(this.transaction, table);
+        List<Integer> columns = this.getEligibleIndexColumns(table);
+        int cost = minOp.estimateIOCost();
+        int skip = -1;
 
-        // TODO(proj3_part2): implement
+        for(Integer i : columns) {
+            SelectPredicate selectPredicate = selectPredicates.get(i);
+            IndexScanOperator indexScanOperator = new IndexScanOperator(this.transaction,
+                    selectPredicate.tableName, selectPredicate.column, selectPredicate.operator,
+                    selectPredicate.value);
+            if(indexScanOperator.estimateIOCost() < cost) {
+                cost = indexScanOperator.estimateIOCost();
+                minOp = indexScanOperator;
+                skip = i;
+            }
+        }
+
+        if(minOp.isIndexScan()) {
+            minOp = addEligibleSelections(minOp, skip);
+        }
+        else {
+            minOp = addEligibleSelections(minOp, -1);
+        }
         return minOp;
     }
 
@@ -695,6 +716,11 @@ public class QueryPlan {
         // Set the final operator to the lowest cost operator from the last
         // pass, add group by, project, sort and limit operators, and return an
         // iterator over the final operator.
+        for(String tableName : this.tableNames) {
+            Table table = this.transaction.getTable(tableName);
+
+
+        }
         return this.executeNaive(); // TODO(proj3_part2): Replace this!
     }
 

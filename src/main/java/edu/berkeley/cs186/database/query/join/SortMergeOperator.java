@@ -2,12 +2,14 @@ package edu.berkeley.cs186.database.query.join;
 
 import edu.berkeley.cs186.database.TransactionContext;
 import edu.berkeley.cs186.database.common.iterator.BacktrackingIterator;
+import edu.berkeley.cs186.database.databox.DataBox;
 import edu.berkeley.cs186.database.query.JoinOperator;
 import edu.berkeley.cs186.database.query.MaterializeOperator;
 import edu.berkeley.cs186.database.query.QueryOperator;
 import edu.berkeley.cs186.database.query.SortOperator;
 import edu.berkeley.cs186.database.table.Record;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
@@ -139,7 +141,43 @@ public class SortMergeOperator extends JoinOperator {
          * or null if there are no more records to join.
          */
         private Record fetchNextRecord() {
-            // TODO(proj3_part1): implement
+            if (leftRecord == null)
+                return null;
+            Record result;
+            while(leftRecord != null) {
+                if (!this.marked) {
+                    while (compare(leftRecord, rightRecord) < 0) {
+                        if (!leftIterator.hasNext())
+                            return null;
+                        leftRecord = leftIterator.next();
+                    }
+                    while (compare(leftRecord, rightRecord) > 0) {
+                        if (!rightIterator.hasNext())
+                            return null;
+                        rightRecord = rightIterator.next();
+                    }
+                    rightIterator.markPrev();
+                    this.marked = true;
+                }
+                if (compare(leftRecord, rightRecord) == 0) {
+                    result = leftRecord.concat(rightRecord);
+                    if (rightIterator.hasNext())
+                        rightRecord = rightIterator.next();
+                    else {
+                        rightIterator.reset();
+                        rightRecord = rightIterator.next();
+                        if (leftIterator.hasNext()) leftRecord = leftIterator.next();
+                        else leftRecord = null;
+                    }
+                    return result;
+                } else {
+                    rightIterator.reset();
+                    rightRecord = rightIterator.next();
+                    if (leftIterator.hasNext()) leftRecord = leftIterator.next();
+                    else leftRecord = null;
+                    this.marked = false;
+                }
+            }
             return null;
         }
 

@@ -135,7 +135,7 @@ public class BNLJOperator extends JoinOperator {
                 return null;
             }
             Record rec = null;
-            while(rec == null) {
+            do {
                 if(this.rightPageIterator != null && this.rightPageIterator.hasNext()) {
                     Record rightRecord = this.rightPageIterator.next();
                     if(compare(this.leftRecord, rightRecord) == 0) {
@@ -160,7 +160,7 @@ public class BNLJOperator extends JoinOperator {
                 else {
                     return null;
                 }
-            }
+            } while(rec == null);
             nextRecord = rec;
             return rec;
         }
